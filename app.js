@@ -9,7 +9,17 @@ app.set("port", process.env.PORT || 3001);
 
 app.use(express.json());
 
-const arr = []
+/**
+ * id: str(UUID)
+ */
+const onlineUser = [];
+let count = 0;
+
+/**
+ * message: str
+ * id: str(UUID)
+ */
+const chatDB = []
 
 const server = http.createServer(app);
 
@@ -21,16 +31,29 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-    io.emit("message", arr);
-    socket.on('connect', () => {
-        console.log('connected to server');
-    })
+    io.emit("message", chatDB);
+    socket.emit('count', onlineUser.length);
+    socket.on('연결', (message) => {
+        const id = message.id
+        if (!onlineUser.filter(e => e.id === id).length) {
+            onlineUser.push({
+                id
+            });
+        }
+        count++;
+        console.log(onlineUser);
+        socket.emit('count', onlineUser.length);
+    });
     socket.on("message", (message) => {
         console.log(message);
-        arr.push({
+        chatDB.push({
             content: message
         });
-        io.emit('message', arr);
+        socket.emit('message', chatDB);
+    });
+    socket.on('disconnect', () => {
+        console.log('끝');
+        count--;
     });
 });
 
