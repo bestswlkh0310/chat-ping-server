@@ -1,10 +1,9 @@
 import express from "express";
 import {Server} from "socket.io";
 import http from "http";
-import {getRandomInt} from "./util.js";
-import {onlineUser, chatList, roomList, setRoomList, setChatList} from "./db.js";
-import {v4} from "uuid";
+import {onlineUser, roomList} from "./repository/Store.js";
 import cors from "cors";
+import Repository from "./repository/Repository.js";
 
 const app = express();
 app.set("port", process.env.PORT || 3001);
@@ -20,82 +19,38 @@ const io = new Server(server, {
     }
 });
 
-const deleteRoomById = (id) => {
-    Object.keys(roomList).forEach(roomId => {
-        const room = roomList[roomId];
-        if (room.member1 === id || room.member2 === id) {
-            delete roomList[roomId];
-            console.log(chatList)
-            setChatList(chatList.filter(chat => chat.roomId !== roomId))
-            console.log(chatList)
-        }
-    });
-};
-
-const getChatListByRoomId = (id) => {
-    return chatList.filter(chat => {
-        return chat.roomId === id
-    });
-}
-
-const getRoomById = (id) => {
-    const rooms = Object.keys(roomList).filter(roomId => {
-        const room = roomList[roomId];
-        return room.member1 === id || room.member2 === id;
-    }).map(roomId => roomList[roomId]);
-
-    if (rooms.length) {
-        return rooms[0]
-    } else {
-        return null;
-    }
-};
 
 io.on("connection", (socket) => {
 
     // 온라인 유저 받아오기
     socket.on('online', (id) => {
-        // 온라인 유저 저장
-        if (!onlineUser[id]) {
-            onlineUser[id] = {
-                lastActive: Date.now(),
-                isChatting: false
-            };
-            console.log(`User [ ${id} ] 가 온라인입니다.`);
-        } else {
-            onlineUser[id].lastActive = Date.now();
-        }
-
-        // 온라인 유저 개수 반환
-        const count = Object.keys(onlineUser).length
-        socket.emit('online', count);
+        Repository.insertUser(id);
+        socket.emit('online', onlineUser.length);
     });
 
     socket.on('cancel', (id) => {
-        const room = getRoomById(id);
-        console.log(room);
+        const room = Repository.getRoomById(id);
         if (room) {
             const {member1, member2} = room;
-            io.emit("cancel", `${member1} ${member2}`);
+            io.emit("cancel", {
+                member1,
+                member2
+            });
         }
-        deleteRoomById(id);
+        Repository.deleteRoomByUserId(id);
     });
 
     socket.on('message', (data) => {
-        const {message, token} = data;
-        const room = getRoomById(token);
+        const {message, id} = data;
+        const room = Repository.getRoomById(id);
         if (room) {
-            console.log(room.roomId);
             const {member1, member2} = room;
-            chatList.push({
-                roomId: room.roomId,
-                sender: token,
-                message: message
-            });
+            Repository.insertChat(id, message, room.id);
+            const chatList = Repository.getChatListByRoomId(room.id)
             io.emit("message", {
                 member1,
                 member2,
-                chatList: getChatListByRoomId(room.roomId)
+                chatList
             });
         }
     });
@@ -104,27 +59,25 @@ io.on("connection", (socket) => {
 app.post("/match/:id", (req, res) => {
     const {id} = req.params;
     let isMatched = false;
-    const room = getRoomById(id);
+    const room = Repository.getRoomById(id);
     if (room) {
-        deleteRoomById(id);
+        Repository.deleteRoomByUserId(id);
     }
 
-    Object.keys(roomList).forEach(roomId => {
-        const room = roomList[roomId];
+    // 이미 채팅방이 있다면 매칭하기
+    roomList.forEach(room => {
         if (!room.member2) {
             room.member2 = id;
             isMatched = true;
-            console.log(`Room [ ${roomId} ] 에서 ${id}와 ${room.member1}가 매칭되었습니다.`);
+            console.log(`Room [ ${room.id} ] 에서 ${id}와 ${room.member1}가 매칭되었습니다.`);
             io.emit('matched', `${id} ${room.member1}`);
         }
     });
+
+    // 없으면 새 채팅방 만들기
     if (!isMatched) {
-        const newRoomId = v4();
-        roomList[newRoomId] = {
-            roomId: newRoomId,
-            member1: id
-        };
-        console.log(`Room [ ${newRoomId} ] 가 생성되었습니다`);
+        Repository.insertRoom(id);
+        console.log(`Room - 생성되었습니다`);
     }
     res.send('success');
 });
@@ -136,20 +89,16 @@ app.delete('/match/:id', (req, res) => {
 
 // 세션이 만료된 유저 핸들링
 setInterval(() => {
-    const currentTime = Date.now();
-    Object.keys(onlineUser).forEach(id => {
-        if (currentTime - onlineUser[id].lastActive > 6_000) {
-            // 유저 삭제
-            delete onlineUser[id];
-            console.log(`User [ ${id} ] 가 오프라인입니다.`);
-
-            // 방 삭제
-            const room = getRoomById(id);
-            if (room) {
-                const {member1, member2} = room;
-                io.emit("cancel", `${member1} ${member2}`);
-            }
-            deleteRoomById(id);
+    const timeoutUser = Repository.findTimeoutUser()
+    timeoutUser.forEach(user => {
+        const room = Repository.getRoomById(user.id);
+        if (room) {
+            const {member1, member2} = room;
+            io.emit("cancel", {
+                member1,
+                member2
+            });
+            Repository.deleteRoomByUserId(user.id);
         }
     });
 }, 2000);

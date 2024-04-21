@@ -1,9 +1,12 @@
 /**
- * key: id (UUID)
- * value:
+ * - id (UUID)
  * - lastActive (Date)
  */
-export let onlineUser = {};
+export let onlineUser = [];
+
+export const setOnlineUser = (newOnlineUser) => {
+    onlineUser = newOnlineUser;
+}
 
 /**
  * - roomId (UUID)
@@ -17,8 +20,7 @@ export const setChatList = (newChatList) => {
 }
 
 /**
- * key: roomId (UUID)
- * value:
+ * - id (UUID)
  * - member1 (UUID)
  * - member2 (UUID)
  */
