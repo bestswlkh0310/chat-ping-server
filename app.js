@@ -45,7 +45,7 @@ io.on("connection", (socket) => {
         const room = Repository.getRoomById(id);
         if (room) {
             const {member1, member2} = room;
-            Repository.insertChat(id, message, room.id);
+            Repository.insertChat(room.id, id, message);
             const chatList = Repository.getChatListByRoomId(room.id)
             io.emit("message", {
                 member1,
@@ -70,7 +70,10 @@ app.post("/match/:id", (req, res) => {
             room.member2 = id;
             isMatched = true;
             console.log(`Room [ ${room.id} ] 에서 ${id}와 ${room.member1}가 매칭되었습니다.`);
-            io.emit('matched', `${id} ${room.member1}`);
+            io.emit('matched', {
+                member1: id,
+                member2: room.member1
+            });
         }
     });
 

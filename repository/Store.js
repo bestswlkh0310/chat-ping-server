@@ -24,7 +24,7 @@ export const setChatList = (newChatList) => {
  * - member1 (UUID)
  * - member2 (UUID)
  */
-export let roomList = {};
+export let roomList = [];
 
 export const setRoomList = (newRoomList) => {
     roomList = newRoomList;

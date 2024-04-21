@@ -12,7 +12,7 @@ class Repository {
 
     getChatListByRoomId = (id) => {
         return chatList.filter(chat => {
-            return chat.id === id
+            return chat.roomId === id
         });
     }
 
@@ -30,19 +30,19 @@ class Repository {
     findByUserId = (id) => {
         const users = onlineUser.filter(user => user.id === id);
         if (users.length) {
-            return users[0]
+            return users[0];
         } else {
             return null;
         }
     }
 
     insertUser = (id) => {
-        const user = this.findByUserId(id)
+        const user = this.findByUserId(id);
         if (user) {
             user.lastActive = Date.now();
         } else {
             const newUser = {
-                id: v4(),
+                id,
                 lastActive: Date.now(),
                 isChatting: false
             }
@@ -52,11 +52,12 @@ class Repository {
     }
 
     insertChat = (roomId, id, message) => {
-        chatList.push({
+        const newChat = {
             roomId,
             senderId: id,
             message
-        });
+        }
+        chatList.push(newChat);
     }
 
     insertRoom = (member1) => {
