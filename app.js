@@ -1,28 +1,16 @@
-const createError = require('http-errors');
-const express = require('express');
-const socket = require('socket.io');
-const {Server} = require("socket.io");
-const http = require("http");
-const {getRandomInt} = require("./util");
+import express from "express";
+import {Server} from "socket.io";
+import http from "http";
+import {getRandomInt} from "./util.js";
+import {onlineUser, chatList, roomList, setRoomList, setChatList} from "./db.js";
+import {v4} from "uuid";
+import cors from "cors";
 
 const app = express();
 app.set("port", process.env.PORT || 3001);
-
+app.use(cors());
 app.use(express.json());
 
-/**
- * key: id: str(UUID)
- * value:
- * - lastActive: Date
- */
-const onlineUser = {};
-let count = 0;
-
-/**
- * message: str
- * id: str(UUID)
- */
-const chatDB = []
 
 const server = http.createServer(app);
 
@@ -43,10 +31,10 @@ io.on("connection", (socket) => {
                 lastActive: Date.now(),
                 isChatting: false
             };
+            console.log(`User [ ${id} ] 가 온라인입니다.`);
         } else {
             onlineUser[id].lastActive = Date.now();
         }
-        console.log(`User [ ${id} ] 가 온라인입니다.`);
 
         // 온라인 유저 개수 반환
         const count = Object.keys(onlineUser).length
@@ -54,26 +42,49 @@ io.on("connection", (socket) => {
     });
 });
 
-app.get("/match/:id", (req, res) => {
-    const {matchId} = req.params;
-    const users = Object.keys(onlineUser).filter(id => !onlineUser[id].isChatting && id !== matchId) // 채팅 안 하고 있는 유저 불러오기
-    const matchedUser = onlineUser[getRandomInt(users.length - 1)];
-
+app.post("/match/:id", (req, res) => {
+    const {id} = req.params;
+    let isMatched = false;
+    Object.keys(roomList).forEach(roomId => {
+        const room = roomList[roomId];
+        if (!room.member2) {
+            room.member2 = id;
+            isMatched = true;
+            console.log(`Room [ ${roomId} ] 에서 ${id}와 ${room.member1}가 매칭되었습니다.`);
+        }
+    });
+    if (!isMatched) {
+        const newRoomId = v4();
+        roomList[newRoomId] = {
+            member1: id
+        };
+        console.log(`Room [ ${newRoomId} ] 가 생성되었습니다`);
+    }
+    res.send('success');
 });
 
 app.delete('/match/:id', (req, res) => {
-    const {id}= req.params;
+    const {id} = req.params;
     console.log(id);
-})
-
+});
 
 // 세션이 만료된 유저 핸들링
 setInterval(() => {
     const currentTime = Date.now();
     Object.keys(onlineUser).forEach((id) => {
         if (currentTime - onlineUser[id].lastActive > 6_000) {
+            // 유저 삭제
             delete onlineUser[id];
             console.log(`User [ ${id} ] 가 오프라인입니다.`);
+
+            // 방 삭제
+            Object.keys(roomList).forEach(roomId => {
+                const room = roomList[roomId];
+                if (room.member1 === id || room.member2 === id) {
+                    delete roomList[roomId];
+                    chatList = chatList.filter(chat => chat.roomId !== roomId);
+                }
+            });
         }
     });
 }, 2000);
