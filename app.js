@@ -25,20 +25,30 @@ const deleteRoomById = (id) => {
         const room = roomList[roomId];
         if (room.member1 === id || room.member2 === id) {
             delete roomList[roomId];
-            Object.keys(chatList).forEach(chatRoomId => {
-                if (chatRoomId === roomId) {
-                    delete chatList[chatRoomId];
-                }
-            });
+            console.log(chatList)
+            setChatList(chatList.filter(chat => chat.roomId !== roomId))
+            console.log(chatList)
         }
     });
 };
 
+const getChatListByRoomId = (id) => {
+    return chatList.filter(chat => {
+        return chat.roomId === id
+    });
+}
+
 const getRoomById = (id) => {
-    return Object.keys(roomList).filter(roomId => {
+    const rooms = Object.keys(roomList).filter(roomId => {
         const room = roomList[roomId];
         return room.member1 === id || room.member2 === id;
     }).map(roomId => roomList[roomId]);
+
+    if (rooms.length) {
+        return rooms[0]
+    } else {
+        return null;
+    }
 };
 
 io.on("connection", (socket) => {
@@ -62,18 +72,43 @@ io.on("connection", (socket) => {
     });
 
     socket.on('cancel', (id) => {
-        const rooms = getRoomById(id);
-        if (rooms.length) {
-            const {member1, member2} = rooms[0];
+        const room = getRoomById(id);
+        console.log(room);
+        if (room) {
+            const {member1, member2} = room;
             io.emit("cancel", `${member1} ${member2}`);
         }
         deleteRoomById(id);
+    });
+
+    socket.on('message', (data) => {
+        const {message, token} = data;
+        const room = getRoomById(token);
+        if (room) {
+            console.log(room.roomId);
+            const {member1, member2} = room;
+            chatList.push({
+                roomId: room.roomId,
+                sender: token,
+                message: message
+            });
+            io.emit("message", {
+                member1,
+                member2,
+                chatList: getChatListByRoomId(room.roomId)
+            });
+        }
     });
 });
 
 app.post("/match/:id", (req, res) => {
     const {id} = req.params;
     let isMatched = false;
+    const room = getRoomById(id);
+    if (room) {
+        deleteRoomById(id);
+    }
+
     Object.keys(roomList).forEach(roomId => {
         const room = roomList[roomId];
         if (!room.member2) {
@@ -86,6 +121,7 @@ app.post("/match/:id", (req, res) => {
     if (!isMatched) {
         const newRoomId = v4();
         roomList[newRoomId] = {
+            roomId: newRoomId,
             member1: id
         };
         console.log(`Room [ ${newRoomId} ] 가 생성되었습니다`);
@@ -108,9 +144,9 @@ setInterval(() => {
             console.log(`User [ ${id} ] 가 오프라인입니다.`);
 
             // 방 삭제
-            const rooms = getRoomById(id);
-            if (rooms.length) {
-                const {member1, member2} = rooms[0];
+            const room = getRoomById(id);
+            if (room) {
+                const {member1, member2} = room;
                 io.emit("cancel", `${member1} ${member2}`);
             }
             deleteRoomById(id);
