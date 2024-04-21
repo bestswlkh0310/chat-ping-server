@@ -1,6 +1,7 @@
 import jwtUtil from "jsonwebtoken";
 import ApiException from "../global/execption/api.exception.js";
 import Config from "../domain/config/config.js";
+import {OAuth2Client} from "google-auth-library";
 
 export const JwtToken = {
     ACCESS_TOKEN: 'ACCESS_TOKEN',
@@ -50,4 +51,18 @@ const getTokenFromHeader = (header) => {
 const getPayloadFromHeader = (header) => {
     const token = getTokenFromHeader(header);
     return decodePayload(token);
+}
+
+export const verifyIdToken = async (idToken) => {
+    const client = new OAuth2Client();
+    let verifiedToken
+    try {
+        verifiedToken = await client.verifyIdToken({
+            idToken: idToken,
+            audience: Config.googleClientId
+        });
+    } catch (e) {
+        throw new ApiException(`Invalid IdToken ${e.message}`, 400);
+    }
+    return verifiedToken;
 }

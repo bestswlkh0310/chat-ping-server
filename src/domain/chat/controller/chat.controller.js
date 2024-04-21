@@ -2,7 +2,7 @@ import Repository from "../../repository/Repository.js";
 import {roomList} from "../../repository/Store.js";
 import Socket from "../../../global/socket/socket.js";
 
-class MatchController {
+class ChatController {
     match = (req, res) => {
         const {id} = req.params;
         let isMatched = false;
@@ -33,4 +33,4 @@ class MatchController {
     }
 }
 
-export default new MatchController();
+export default new ChatController();

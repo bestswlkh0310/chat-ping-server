@@ -1,4 +1,4 @@
-const handler = (middleware) => {
+const authHandler = (middleware) => {
     return (req, res, next) => {
         try {
             middleware(req, res, next);
@@ -8,4 +8,4 @@ const handler = (middleware) => {
     };
 };
 
-export default handler;
+export default authHandler;
