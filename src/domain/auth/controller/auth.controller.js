@@ -1,8 +1,7 @@
-import {OAuth2Client} from "google-auth-library";
-import Config from "../../config/config.js";
-import ApiException from "../../../global/execption/api.exception.js";
-import {generateToken, JwtToken, verifyIdToken} from "../../../common/jwt.js";
+import {decodePayload, generateToken, getTokenByReq, JwtToken} from "../../../common/jwt.js";
 import AuthRepository from "../repository/user.repository.js";
+import ApiException from "../../../global/execption/api.exception.js";
+import {verifyIdToken} from "../../../common/oauth.js";
 
 class AuthController {
     login = async (req, res) => {
@@ -25,7 +24,27 @@ class AuthController {
         }, JwtToken.ACCESS_TOKEN);
 
         res.send({
-            accessToken, refreshToken
+            accessToken,
+            refreshToken
+        });
+    };
+
+    refresh = async (req, res) => {
+        const refreshToken = getTokenByReq(req);
+        const payload = await decodePayload(refreshToken);
+        const {email} = payload;
+
+        if (!email) {
+            throw new ApiException('유효하지 않은 토큰', 401);
+        }
+
+        const accessToken = generateToken({
+            email: email,
+        }, JwtToken.ACCESS_TOKEN);
+
+        res.send({
+            accessToken: accessToken,
+            refreshToken: refreshToken,
         });
     };
 }

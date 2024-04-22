@@ -1,35 +1,48 @@
-import Repository from "../../repository/Repository.js";
-import {roomList} from "../../repository/Store.js";
-import Socket from "../../../global/socket/socket.js";
+import {decodePayload, getTokenByReq} from "../../../common/jwt.js";
+import RoomRepository from "../repository/room.repository.js";
+import UserRoomRepository from "../repository/user.room.repository.js";
+import {RoomState} from "@prisma/client";
+import UserRepository from "../../auth/repository/user.repository.js";
+import {choiceArr} from "../../../common/random.js";
+import ApiException from "../../../global/execption/api.exception.js";
 
 class ChatController {
-    match = (req, res) => {
-        const {id} = req.params;
-        let isMatched = false;
-        const room = Repository.getRoomById(id);
-        if (room) {
-            Repository.deleteRoomByUserId(id);
+    match = async (req, res) => {
+        const accessToken = getTokenByReq(req);
+        const {email} = decodePayload(accessToken);
+        const user = await UserRepository.findByEmail(email);
+        if (!user) {
+            throw new ApiException('유저를 찾을 수 없습니다', 404);
         }
 
         // 이미 채팅방이 있다면 매칭하기
-        roomList.forEach(room => {
-            if (!room.member2) {
-                room.member2 = id;
-                isMatched = true;
-                console.log(`Room [ ${room.id} ] 에서 ${id}와 ${room.member1}가 매칭되었습니다.`);
-                Socket.io.emit('matched', {
-                    member1: id,
-                    member2: room.member1
-                });
+        const availableRooms = await RoomRepository.findByStateWithoutUserId(RoomState.IDLE, user.id);
+        let invalidMatch = true;
+        user.userRoom.forEach(userRoom => {
+            if (!invalidMatch) {
+                return;
+            }
+            const state = userRoom.room.state;
+            if (state === RoomState.MATCHED || state === RoomState.IDLE) {
+                invalidMatch = false;
+                return res.status(400).send({message: '이미 매칭 중입니다'});
             }
         });
-
-        // 없으면 새 채팅방 만들기
-        if (!isMatched) {
-            Repository.insertRoom(id);
-            console.log(`Room - 생성되었습니다`);
+        if (!invalidMatch) {
+            return;
         }
-        res.send('success');
+
+        if (availableRooms.length) {
+            const matchedRoom = choiceArr(availableRooms);
+            await RoomRepository.updateStateId(RoomState.MATCHED, matchedRoom.id);
+            await UserRoomRepository.insertUserRoom(user.id, matchedRoom.id);
+            return res.send({message: '매칭됐어요!'});
+        } else {
+            const room = await RoomRepository.insertRoom();
+            await UserRoomRepository.insertUserRoom(user.id, room.id);
+            console.log(`Room - 매칭할 채팅방이 없어 새 채팅방이 생성되었습니다`);
+            return res.send({message: '매칭할 채팅방이 없어 새 채팅방이 생성되었습니다'});
+        }
     }
 }
 

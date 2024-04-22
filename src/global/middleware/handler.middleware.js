@@ -1,11 +1,11 @@
-const authHandler = (middleware) => {
-    return (req, res, next) => {
+const awaitHandler = (middleware) => {
+    return async (req, res, next) => {
         try {
-            middleware(req, res, next);
+            await middleware(req, res, next);
         } catch (err) {
             next(err);
         }
     };
 };
 
-export default authHandler;
+export default awaitHandler;

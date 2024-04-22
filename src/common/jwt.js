@@ -1,7 +1,6 @@
 import jwtUtil from "jsonwebtoken";
 import ApiException from "../global/execption/api.exception.js";
 import Config from "../domain/config/config.js";
-import {OAuth2Client} from "google-auth-library";
 
 export const JwtToken = {
     ACCESS_TOKEN: 'ACCESS_TOKEN',
@@ -15,7 +14,7 @@ export const getTokenExpiredAt = (type) => {
         case JwtToken.REFRESH_TOKEN:
             return '2h'
     }
-}
+};
 
 export const generateToken = (payload, type) => {
     return jwtUtil.sign(
@@ -26,18 +25,18 @@ export const generateToken = (payload, type) => {
             expiresIn: getTokenExpiredAt(type),
         }
     );
-}
+};
 
 export const decodePayload = (token) => {
     if (!token) {
-        throw new ApiException('TokenMissingException', 403);
+        throw new ApiException('유효하지 않은 토큰', 401);
     }
     return jwtUtil.decode(token, Config.jwtSecret, (err) => {
         if (err) {
             if (err.name === 'TokenExpiredError') {
-                throw new ApiException('TokenExpiredException', 401);
+                throw new ApiException('유효하지 않은 토큰', 401);
             }
-            throw new ApiException('TokenVerificationException', 403);
+            throw new ApiException('유효하지 않은 토큰', 401);
         }
     });
 };
@@ -53,16 +52,13 @@ const getPayloadFromHeader = (header) => {
     return decodePayload(token);
 }
 
-export const verifyIdToken = async (idToken) => {
-    const client = new OAuth2Client();
-    let verifiedToken
-    try {
-        verifiedToken = await client.verifyIdToken({
-            idToken: idToken,
-            audience: Config.googleClientId
-        });
-    } catch (e) {
-        throw new ApiException(`Invalid IdToken ${e.message}`, 400);
+export const getTokenByReq = (req) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        throw new ApiException('유효하지 않은 토큰', 401);
     }
-    return verifiedToken;
+    if (!authorization.startsWith('Bearer ')) {
+        throw new ApiException('유효하지 않은 토큰', 401);
+    }
+    return authorization.split(' ')[1];
 }

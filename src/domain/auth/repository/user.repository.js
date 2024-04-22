@@ -25,6 +25,13 @@ class UserRepository {
         const user = await prisma.user.findMany({
             where: {
                 email: email
+            },
+            include: {
+                userRoom: {
+                    include: {
+                        room: true
+                    }
+                }
             }
         });
         if (user.length > 0) {

@@ -38,10 +38,17 @@ model UserRoom {
   updateAt DateTime @updatedAt
 }
 
+enum RoomState {
+  IDLE
+  MATCHED
+  FINISHED
+}
+
 model Room {
   id       Int        @id @default(autoincrement())
   userRoom UserRoom[]
   chat     Chat[]
+  state    RoomState  @default(IDLE)
   createAt DateTime   @default(now())
   updateAt DateTime   @updatedAt
 }
