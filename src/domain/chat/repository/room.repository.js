@@ -49,6 +49,13 @@ class RoomRepository {
             },
             data: {
                 state: state
+            },
+            include: {
+                userRoom: {
+                    include: {
+                        user: true
+                    }
+                }
             }
         });
     }

@@ -14,6 +14,9 @@ class UserRoomRepository {
         return prisma.userRoom.findMany({
             where: {
                 roomId: roomId
+            },
+            include: {
+                user: true
             }
         });
     }

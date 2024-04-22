@@ -29,7 +29,8 @@ class UserRepository {
             include: {
                 userRoom: {
                     include: {
-                        room: true
+                        room: true,
+                        user: true
                     }
                 }
             }
@@ -48,6 +49,17 @@ class UserRepository {
         if (user.length > 0) {
             return user[0];
         }
+    }
+
+    updateSocketIdByEmail = async (email, socketId) => {
+        return prisma.user.updateMany({
+            where: {
+                email: email
+            },
+            data: {
+                socketId: socketId
+            }
+        });
     }
 }
 

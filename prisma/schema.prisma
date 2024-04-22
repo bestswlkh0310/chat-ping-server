@@ -13,6 +13,7 @@ model User {
   lastActive DateTime   @default(now())
   userRoom   UserRoom[]
   chats      Chat[]
+  socketId   String     @default("")
   createAt   DateTime   @default(now())
   updateAt   DateTime   @updatedAt
 }

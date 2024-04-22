@@ -25,7 +25,8 @@ class AuthController {
 
         res.send({
             accessToken,
-            refreshToken
+            refreshToken,
+            email
         });
     };
 

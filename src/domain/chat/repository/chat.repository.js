@@ -5,6 +5,19 @@ class ChatRepository {
         return prisma.chat.findMany({
             where: {
                 roomId: roomId
+            },
+            include: {
+                sender: true
+            }
+        });
+    }
+
+    insert = async (message, senderId, roomId) => {
+        return prisma.chat.create({
+            data: {
+                message,
+                senderId,
+                roomId
             }
         });
     }
