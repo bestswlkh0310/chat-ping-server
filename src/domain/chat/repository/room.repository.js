@@ -1,25 +1,8 @@
 import prisma from "../../../../prisma/context.js";
-import {RoomState} from "@prisma/client";
 
 class RoomRepository {
-    findByUserId = async (userId) => {
-        return prisma.user
-            .findFirst({
-                where: {
-                    userId: Number(userId)
-                },
-            })
-            .userRoom({
-                where: {
-                    userId: userId
-                },
-                select: {
-                    room: true
-                }
-            });
-    }
 
-    findByStateWithoutUserId = async (state, userId) => {
+    findByStateWithoutUser = async (state, user) => {
         return prisma.room.findMany({
             where: {
                 state: state,
@@ -27,7 +10,7 @@ class RoomRepository {
                     some: {
                         NOT: [
                             {
-                                userId: userId
+                                user: user
                             }
                         ]
                     }
@@ -42,10 +25,10 @@ class RoomRepository {
         });
     }
 
-    updateStateId = async (state, id) => {
+    updateState = async (state, room) => {
         return prisma.room.update({
             where: {
-                id: Number(id)
+                id: room.id
             },
             data: {
                 state: state

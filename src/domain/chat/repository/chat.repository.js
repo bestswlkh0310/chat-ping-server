@@ -1,10 +1,10 @@
 import prisma from "../../../../prisma/context.js";
 
 class ChatRepository {
-    findByRoomId = async (roomId) => {
+    findByRoom = async (room) => {
         return prisma.chat.findMany({
             where: {
-                roomId: roomId
+                room: room
             },
             include: {
                 sender: true
@@ -12,12 +12,12 @@ class ChatRepository {
         });
     }
 
-    insert = async (message, senderId, roomId) => {
+    insert = async (message, sender, room) => {
         return prisma.chat.create({
             data: {
-                message,
-                senderId,
-                roomId
+                message: message,
+                senderId: sender.id,
+                roomId: room.id
             }
         });
     }

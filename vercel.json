@@ -6,8 +6,9 @@
       "destination": "/"
     }
   ],
-  "buildCommand": "npm start",
+  "buildCommand": "prisma generate",
   "build": {
 
-  }
+  },
+  "installCommand": "npm i"
 }

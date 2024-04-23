@@ -1,5 +1,4 @@
 import prisma from "../../../../prisma/context.js";
-import {filters} from "pug";
 
 class UserRepository {
     register = async (email) => {
@@ -22,22 +21,11 @@ class UserRepository {
     }
 
     findByEmail = async (email) => {
-        const user = await prisma.user.findMany({
+        return prisma.user.findFirst({
             where: {
                 email: email
-            },
-            include: {
-                userRoom: {
-                    include: {
-                        room: true,
-                        user: true
-                    }
-                }
             }
         });
-        if (user.length > 0) {
-            return user[0];
-        }
     }
 
     existByEmail = async (email) => {

@@ -18,7 +18,8 @@ class ChatController {
             throw new ApiException('유저를 찾을 수 없습니다', 400);
         }
         let resultState = RoomState.IDLE
-        user.userRoom.forEach(userRoom => {
+        const userRoom = await UserRoomRepository.findByUser(user);
+        userRoom.forEach(userRoom => {
             const state = userRoom.room.state
             if (state === RoomState.MATCHED) {
                 resultState = RoomState.MATCHED;
@@ -36,13 +37,15 @@ class ChatController {
         const {email} = decodePayload(accessToken);
         const user = await UserRepository.findByEmail(email);
         if (!user) {
+            console.log('not found user');
             throw new ApiException('유저를 찾을 수 없습니다', 404);
         }
 
         // 이미 채팅방이 있다면 매칭하기
-        const availableRooms = await RoomRepository.findByStateWithoutUserId(RoomState.IDLE, user.id);
+        const availableRooms = await RoomRepository.findByStateWithoutUser(RoomState.IDLE, user);
         let invalidMatch = true;
-        user.userRoom.forEach(userRoom => {
+        const userRoom = await UserRoomRepository.findByUser(user);
+        userRoom.forEach(userRoom => {
             if (!invalidMatch) {
                 return;
             }
@@ -58,8 +61,8 @@ class ChatController {
 
         if (availableRooms.length) {
             const matchedRoom = choiceArr(availableRooms);
-            const room = await RoomRepository.updateStateId(RoomState.MATCHED, matchedRoom.id);
-            await UserRoomRepository.insertUserRoom(user.id, matchedRoom.id);
+            const room = await RoomRepository.updateState(RoomState.MATCHED, matchedRoom);
+            await UserRoomRepository.insertUserRoom(user, matchedRoom);
             room.userRoom.forEach((userRoom) => {
                 const socketId = userRoom.user.socketId;
                 console.log('sended- ',socketId);
@@ -68,7 +71,8 @@ class ChatController {
             return res.send({message: '매칭됐어요!'});
         } else {
             const room = await RoomRepository.insertRoom();
-            await UserRoomRepository.insertUserRoom(user.id, room.id);
+            console.log('inserted -', room);
+            await UserRoomRepository.insertUserRoom(user, room);
             console.log(`Room - 매칭할 채팅방이 없어 새 채팅방이 생성되었습니다`);
             return res.status(400).send({message: '매칭할 채팅방이 없어 새 채팅방이 생성되었습니다'});
         }
@@ -78,17 +82,15 @@ class ChatController {
         const accessToken = getTokenByReq(req);
         const {email} = decodePayload(accessToken);
         const user = await UserRepository.findByEmail(email);
-        if (!user) {
-            throw new ApiException('유저를 찾을 수 없습니다', 404);
-        }
-        for (const userRoom of user.userRoom) {
-            if (userRoom.room.state !== RoomState.FINISHED) {
-                await RoomRepository.updateStateId(RoomState.FINISHED, userRoom.room.id);
-                const userRooms = await UserRoomRepository.findByRoomId(userRoom.room.id);
-                userRooms.forEach((userRoom) => {
-                    SocketClient.io.to(userRoom.user.socketId).emit('flow');
-                });
-            }
+        const userRooms = await UserRoomRepository.findByUserStateIsFinished(user);
+        for (const userRoom of userRooms) {
+            await RoomRepository.updateState(RoomState.FINISHED, userRoom.room);
+            const userRooms = await UserRoomRepository.findBySelf(userRoom);
+
+            // '채팅 종료' 소켓 전송
+            userRooms.forEach((userRoom) => {
+                SocketClient.io.to(userRoom.user.socketId).emit('flow');
+            });
         }
         res.send({message: 'finish'});
     };
@@ -98,17 +100,17 @@ class ChatController {
         const accessToken = getTokenByReq(req);
         const {email} = decodePayload(accessToken);
         const user = await UserRepository.findByEmail(email);
-        for (const userRoom of user.userRoom) {
-            const room = userRoom.room;
-            const state = room.state;
-            if (state === RoomState.MATCHED) {
-                await ChatRepository.insert(message, user.id, room.id);
-                const chatList = await ChatRepository.findByRoomId(room.id);
-                const userRoom = await UserRoomRepository.findByRoomId(room.id);
-                userRoom.forEach(userRoom => {
-                    SocketClient.io.to(userRoom.user.socketId).emit('message', chatList);
-                });
-            }
+        const userRooms = await UserRoomRepository.findByUserStateIsMatched(user);
+        for (const userRoom of userRooms) {
+            await ChatRepository.insert(message, user, userRoom.room);
+            const chatList = await ChatRepository.findByRoom(userRoom.room);
+            const userRooms = await UserRoomRepository.findBySelf(userRoom);
+
+            // '메세지 전송' 소켓 전송
+            userRooms.forEach(userRoom => {
+                console.log(userRoom.user.socketId)
+                SocketClient.io.to(userRoom.user.socketId).emit('message', chatList);
+            });
         }
         res.send({message: '채팅 전송 성공'});
     };
@@ -117,13 +119,10 @@ class ChatController {
         const accessToken = getTokenByReq(req);
         const {email} = decodePayload(accessToken);
         const user = await UserRepository.findByEmail(email);
-        for (const userRoom of user.userRoom) {
-            const room = userRoom.room;
-            const state = room.state;
-            if (state === RoomState.MATCHED) {
-                const chatList = await ChatRepository.findByRoomId(room.id);
-                return res.send(chatList);
-            }
+        const userRooms = await UserRoomRepository.findByUserStateIsMatched(user);
+        for (const userRoom of userRooms) {
+            const chatList = await ChatRepository.findByRoom(userRoom.room);
+            return res.send(chatList);
         }
     };
 }
